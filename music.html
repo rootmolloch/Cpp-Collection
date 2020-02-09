@@ -1,0 +1,419 @@
+<html>
+	<head>
+		<script>
+			class MyFunction {
+				constructor(numWaves) {
+					this.as = [];
+					this.bs = [];
+					
+					for(var i = 0;i < numWaves;++i) {
+						this.as.push((1 / Math.pow(i + 1,0.2) * Math.random() + 0.1));
+						this.bs.push(4 * Math.random());
+					}
+				}
+				
+				call(x) {
+					var sum = 0;
+					var asSum = 0;
+					
+					for(var i = 0;i < this.as.length;++i) {
+						sum += this.as[i] * Math.sin((x / Math.pow(2,10.0 / 12.0) + this.bs[i]) * Math.PI * 2);
+						asSum += this.as[i];
+					}
+					
+					return sum / asSum;
+				}
+			}
+
+
+			var audio = new (window.AudioContext || window.webkitAudioContext)();
+			
+			class Wave {
+				constructor() {
+					this.init();
+				}
+
+				instanciate() {
+					return new Wave();
+				}
+
+				init() {
+					this.mf = new MyFunction(1);
+					this.att = Math.pow(Math.random(),1.2);
+					this.comp = Math.pow(Math.random(),1.2);
+				}
+
+				f(n,j) {
+					var fr = Math.pow(2,(n - 49) / 12.0);
+					var x = j / 44100 * fr * 440;
+
+					var sum = this.mf.call(x);
+					sum *= Math.atan((j - 22000 * this.att) * 0.005 ) / Math.PI + 0.5;
+					sum *= Math.atan((-j + 42000 + 22000 * this.comp) * 0.001 ) / Math.PI + 0.5;
+
+					return sum;
+				}
+
+				mult(factor) {
+					var w = this.instanciate();
+					
+					for(var i = 0;i < this.mf.as.length;++i) w.mf.as[i] = this.mf.as[i] * factor;
+					for(var i = 0;i < this.mf.bs.length;++i) w.mf.bs[i] = this.mf.bs[i] * factor;
+					for(var i = 0;i < this.mf.ps.length;++i) w.mf.ps[i] = this.mf.ps[i] * factor;
+					
+					w.att = this.att * factor;
+					w.comp = this.comp * factor;
+
+					return w;
+				}
+
+				add(w) {
+					var w0 = this.instanciate();
+
+					for(var i = 0;i < this.mf.as.length;++i) w0.mf.as[i] = this.mf.as[i] + w.mf.as[i];
+					for(var i = 0;i < this.mf.bs.length;++i) w0.mf.bs[i] = this.mf.bs[i] + w.mf.bs[i];
+					for(var i = 0;i < this.mf.ps.length;++i) w0.mf.ps[i] = this.mf.ps[i] + w.mf.ps[i];
+
+					w0.att = this.att + w.att;
+					w0.comp = this.comp + w.comp;
+
+					return w0;
+				}
+
+				zero() {
+					var w0 = this.instanciate();
+
+					for(var i = 0;i < this.mf.as.length;++i) w0.mf.as[i] = 0;
+					for(var i = 0;i < this.mf.bs.length;++i) w0.mf.bs[i] = 0;
+					for(var i = 0;i < this.mf.ps.length;++i) w0.mf.ps[i] = 0;
+
+					w0.att = 0;
+					w0.comp = 0;
+
+					return w0;
+				}
+
+				clone() {
+					var w0 = this.instanciate();
+					w0.canvasname = this.canvasname;
+
+					for(var i = 0;i < this.mf.as.length;++i) w0.mf.as[i] = this.mf.as[i];
+					for(var i = 0;i < this.mf.bs.length;++i) w0.mf.bs[i] = this.mf.bs[i];
+					for(var i = 0;i < this.mf.ps.length;++i) w0.mf.ps[i] = this.mf.ps[i];
+
+					w0.att = this.att;
+					w0.comp = this.comp;
+
+					return w0;
+				}
+
+				mutate() {
+					var w0 = this.instanciate();
+
+					for(var i = 0;i < this.mf.as.length;++i) w0.mf.as[i] = this.mf.as[i] + 0.4 * Math.random() - 0.2;
+					for(var i = 0;i < this.mf.bs.length;++i) w0.mf.bs[i] = this.mf.bs[i] + 0.4 * Math.random() - 0.2;
+					for(var i = 0;i < this.mf.ps.length;++i) w0.mf.ps[i] = this.mf.ps[i] + 0.4 * Math.random() - 0.2;
+
+					w0.att = this.att + 0.4 * Math.random() - 0.2;
+					w0.comp = this.comp + 0.4 * Math.random() - 0.2;
+
+					return w0;
+				}
+
+				render(cname) {
+					this.canvasname = cname;
+					var c = document.getElementById(cname);
+					var ctx = c.getContext("2d");
+
+					ctx.fillStyle = "black";
+					ctx.fillRect(0,0,c.width,c.height);
+
+					ctx.strokeStyle = "white";
+					ctx.lineWidth = 3;
+
+					ctx.beginPath();
+					ctx.moveTo(0,0);
+
+					for(var i = 0;i < 200;++i) {
+						ctx.lineTo(c.width * i / 200,c.height - c.height * (this.f(49,64000 * i / 200) + 1) / 2);
+					}
+
+					ctx.stroke();
+				}
+
+		play(n) {
+		var buf = audio.createBuffer(1,64000,44100);
+		var data = buf.getChannelData(0);
+
+		for(var i = 0;i < data.length;++i) {
+		data[i] = this.f(n,i) / 5;
+		}
+
+		var mix = audio.createBufferSource();
+		mix.buffer = buf;
+		mix.connect(audio.destination);
+
+		mix.start();
+		this.timer = window.setInterval(function() {
+		var c = document.getElementById(this.canvasname);
+		if(c.style.borderColor == "black")
+		c.style.borderColor = "red";
+		else
+		c.style.borderColor = "black";
+		}.bind(this),100);
+
+		mix.addEventListener("ended",function() {
+		window.clearInterval(this.timer);
+		document.getElementById(this.canvasname).style.borderColor = "black";
+		}.bind(this));
+		return mix;
+		}
+
+		demo() {
+		this.play(25).addEventListener("ended",function () {
+		this.play(35).addEventListener("ended",function () {
+		this.play(49).addEventListener("ended",function () {
+		}.bind(this));
+		}.bind(this));
+		}.bind(this));
+		}
+		}
+
+		class Algorithm {
+		constructor(model0) {
+		this.xs = [];
+
+		for(var i = 0;i < 10;++i) {
+		this.xs.push(model0.instanciate());
+		}
+		}
+
+		mutate(model0) {
+		this.xs = [];
+
+		for(var i = 0;i < 10;++i) {
+		this.xs.push(model0.mutate());
+		}
+		}
+
+		linearCombination(suffix) {
+		if(!suffix) suffix = "";
+		
+		var rewards = [];
+
+		for(var i = 0;i < this.xs.length;++i) {
+			console.log("myrange" + suffix + i);
+			rewards.push(parseFloat(document.getElementById("myrange" + suffix + i).value));
+		}
+
+		var maxr = -100000;
+		var minr = 100000;
+
+		for(var i = 0;i < this.xs.length;++i) {
+		if(rewards[i] > maxr) maxr = rewards[i];
+		if(rewards[i] < minr) minr = rewards[i];
+		}
+
+		var fsum = 0;
+
+		var w0 = this.xs[0].zero();
+
+		for(var i = 0;i < this.xs.length;++i) {
+		var f = (rewards[i] - minr) / (maxr - minr);
+		fsum += f;
+
+		w0 = w0.add(this.xs[i].mult(f));
+		}
+
+		w0 = w0.mult(1.0 / fsum);
+
+		return w0;
+		}
+                
+                toUL(uname,suffix,add) {
+                    var str = "";
+                    
+                    for(var i = 0;i < this.xs.length;++i) {
+                        str += "<table style='display:inline-block'><tr><td>";
+                        str += "<canvas width=80 height=40 id='my" + suffix + "c" + i + "' style='border-style:solid;border-width:10px;border-color:black'";
+                        str += "onmouseover='this.style.borderColor=\"blue\";myf0 = algo.xs[" + i + "].clone();'  ";
+                        str += "onmouseout='this.style.borderColor=\"black\";myf0 = null'  ";
+                        str += "></canvas></td><td>";
+                        str += "<input type='range' min=0 max=100 id='myrange" + suffix + i + "'><br>";
+                        str += "<button onclick='algo" + suffix + ".xs[" + i + "].demo()'>demo</button><br>";
+                        if(add) str += "<button onclick='instruments.push(algo.xs[" + i + "].clone());instrumentsToUL(\"instrul\");'>add to instruments</button>";
+                        str += "</td></tr></table>";
+                    }
+                    
+                    document.getElementById(uname).innerHTML = str;
+
+                    for(var i = 0;i < this.xs.length;++i) {
+                        this.xs[i].render("my" + suffix + "c" + i);
+                    }
+                }
+            }
+                        
+            function instrumentsToUL(uname) {
+                    var str = "";
+                    
+                    for(var i = 0;i < instruments.length;++i) {
+                        str += "<table style='display:inline-block'><tr><td>";
+                        str += "<canvas width=80 height=40 id='myinsc" + i + "' style='border-style:solid;border-width:10px;border-color:black'";
+                        str += "onmouseover='this.style.borderColor=\"blue\";myf0 = instruments[" + i + "].clone();'  ";
+                        str += "onmouseout='this.style.borderColor=\"black\";myf0 = null'  ";
+                        str += "></canvas></td><td>";
+                        str += "<button onclick='myf = instruments[" + i + "];myf.render(\"myc\");'>load</button><br>";
+                        str += "<button onclick='instruments[" + i + "].demo()'>demo</button><br>";
+                        str += "<button onclick='instruments.splice(" + i + ",1);instrumentsToUL(\"instrul\");'>remove</button><br>";
+                        str += "<input type='radio' name='instrumentformelody' onclick='myf1 = instruments[" + i + "]'>";
+                        str += "</td></tr></table>";
+                    }
+                    
+                    document.getElementById(uname).innerHTML = str;
+
+                    for(var i = 0;i < instruments.length;++i) {
+                        instruments[i].render("myinsc" + i);
+                    }
+            }
+            
+            var scale = [0,2,4,5,7,9,11];
+            var sc = [];
+            for(var i = 0;i < 3;++i) {
+                for(var j = 0;j < scale.length;++j) {
+                    sc.push(scale[j] + 20 + i * 12);
+                }
+            }
+            console.log(sc);
+
+		var n0 = 0;
+            
+            class Melody extends Wave {
+                constructor() {
+                    super();
+                    this.tm = null;
+                }
+                
+                instanciate() {
+                    return new Melody();
+                }
+
+                f(n,j) {
+                    return super.f(n,(j - 32000) / 200 + 32000);
+                }
+                
+                demo() {
+                    if(this.tm == null) {
+                        this.k = 0;
+                        
+                        this.tm = window.setInterval(function() {
+                            var c = document.getElementById(this.canvasname);
+                            if(c.style.borderColor == "black")
+                                c.style.borderColor = "red";
+                            else
+                                c.style.borderColor = "black";
+
+                            myf1.play(sc[Math.round((sc.length - 2) * (this.f(49,this.k) / 2 + 0.5)) + n0 - 3]);
+                            
+                            this.k += 1000;
+                            if(this.k > 64000) {
+                            	this.k = 0;
+                            	n0 = Math.floor(4 * Math.random());
+                            	console.log(n0);
+                            }
+                        }.bind(this),500);
+                    } else {
+                        var c = document.getElementById(this.canvasname);
+                        c.style.borderColor = "black";
+                        window.clearInterval(this.tm);
+                        this.tm = null;
+                    }
+                }
+            }
+
+            var keys = ["q","2","w","e","4","r","5","t","z","7","u","8","i","9","o","p","ß","ü","'","+"];
+            var myf = new Wave();
+            var myf0 = myf;
+            var myf1 = myf;
+            var algo = new Algorithm(myf);
+            var instruments = [];
+            var mym = new Melody();
+            var mym0 = mym;
+            var algom = new Algorithm(mym);
+            var melodies = [];
+            
+            document.addEventListener('keydown', function(event) {
+                console.log(keys.findIndex((k) => (k == event.key)) + 44);
+                myf0.play(keys.findIndex((k) => (k == event.key)) + 44);
+            }, false);
+        </script>
+    </head>
+    <body>
+        <div style="border-style:solid;border-width:10px;border-color:red">
+            <h1>Click Your Wave</h1>
+            <table>
+                <tr>
+                    <td>
+                        <canvas 
+                            width=800 height=400 id="myc" style="border-style:solid;border-width:10px;border-color:black"
+                            onmouseover="this.style.borderColor='blue';myf0 = myf.clone();"
+                            onmouseout="this.style.borderColor='black'"
+                        ></canvas>
+                    </td>
+                    <td>
+                        <button onclick="myf = algo.linearCombination();myf.render('myc');">linear combination</button><br>
+                        <button onclick="algo.mutate(myf);algo.toUL('myul','',true);">mutate</button><br>
+                        <button onclick="myf.demo()">demo</button><br>
+                        <button onclick="myf = new Wave();algo = new Algorithm(myf);myf.render('myc');algo.toUL('myul','',true);">reset</button><br>
+                        <button onclick="instruments.push(myf.clone());instrumentsToUL('instrul');">add instrument</button><br>
+                    </td>
+                </tr>
+            </table>
+            
+            <div id="myul">
+            </div>
+        </div>
+        
+        
+        <div style="border-style:solid;border-width:10px;border-color:green">
+            <h1>Instruments</h1>
+            <div style="border-style:solid;border-width:10px;border-color:black" id="instrul">
+                
+            </div>
+        </div>
+        
+        <div style="border-style:solid;border-width:10px;border-color:red">
+            <h1>Click Your Melody</h1>
+            <table>
+                <tr>
+                    <td>
+                        <canvas 
+                            width=800 height=400 id="mymc" style="border-style:solid;border-width:10px;border-color:black"
+                            onmouseover="this.style.borderColor='blue';myf0 = myf.clone();"
+                            onmouseout="this.style.borderColor='black'"
+                        ></canvas>
+                    </td>
+                    <td>
+                        <button onclick="mym = algom.linearCombination('m');mym.render('mymc');">linear combination</button><br>
+                        <button onclick="algom.mutate(mym);algom.toUL('mymul','m');">mutate</button><br>
+                        <button onclick="mym.demo()">demo</button><br>
+                        <button onclick="mym = new Melody();algom = new Algorithm(mym);mym.render('mymc');algom.toUL('mymul','m');">reset</button><br>
+                        <button onclick="instruments.push(myf.clone());instrumentsToUL('instrul');">add instrument</button><br>
+                    </td>
+                </tr>
+            </table>
+            
+            <div id="mymul">
+            </div>
+        </div>
+        
+        <script>
+            myf.render("myc");
+            algo.toUL("myul","",true);
+            mym.render("mymc");
+            algom.toUL("mymul","m");
+        </script>
+    </body>
+</html>
+
+
+

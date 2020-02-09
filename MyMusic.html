@@ -1,0 +1,45 @@
+<html>
+	<head>
+		<script>
+			var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+			
+			function myPow(x,y) {
+				return Math.sign(x) * Math.pow(Math.abs(x),y);
+			}
+			
+			class Instrument {
+				constructor() {
+					this.rise = Math.PI;
+					this.att = Math.PI * 10;
+				}
+				
+				play(tone) {
+					const fr = Math.pow(2,(tone - 49) / 12) * 440 * Math.PI / audioCtx.sampleRate;
+					const len = 64000;
+					var myArrayBuffer = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+
+					var nowBuffering = myArrayBuffer.getChannelData(0);
+					for (var i = 0; i < myArrayBuffer.length; i++) {
+						var x = Math.atan(50 * i / len - this.rise) / Math.PI + 0.5;
+						var y = Math.atan(50 * (1 - i / len) - this.att) / Math.PI + 0.5;
+						var z = Math.cos(i / len * 20);
+						nowBuffering[i] = Math.atan(myPow(Math.sin(fr * i),1) * 1) * x * y * z / Math.PI * 2;
+					}
+
+					var source = audioCtx.createBufferSource();
+					source.buffer = myArrayBuffer;
+					source.connect(audioCtx.destination);
+					source.start();
+				}
+			}
+			
+			new Instrument().play(49);
+		</script>
+	</head>
+	<body>
+	</body>
+</html>
+
+
+
+
